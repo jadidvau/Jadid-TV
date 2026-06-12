@@ -1,0 +1,52 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- TV Antenna / Signals -->
+    <path
+        android:fillColor="#00FF66"
+        android:pathData="M54,34 L40,18 M54,34 L68,18"
+        android:strokeColor="#00FF66"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"/>
+
+    <!-- Antennas Tips -->
+    <path
+        android:fillColor="#00FF66"
+        android:pathData="M40,18m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0 M68,18m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- Modern Rounded Television Screen Frame -->
+    <path
+        android:fillColor="#120E22"
+        android:strokeColor="#00FF66"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:pathData="M24,34 C24,30.686 26.686,28 30,28 L78,28 C81.314,28 84,30.686 84,34 L84,72 C84,75.314 81.314,78 78,78 L30,78 C26.686,78 24,75.314 24,72 Z" />
+
+    <!-- TV Stand Legs -->
+    <path
+        android:fillColor="#00FF66"
+        android:pathData="M38,78 L32,88 M70,78 L76,88"
+        android:strokeColor="#00FF66"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"/>
+
+    <!-- TV Stand Base Bar -->
+    <path
+        android:fillColor="#00FF66"
+        android:pathData="M28,88 L80,88"
+        android:strokeColor="#00FF66"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"/>
+
+    <!-- Glowing Futuristic Media Broadcast Play Button -->
+    <path
+        android:fillColor="#00FF66"
+        android:pathData="M46,43 L68,53 L46,63 Z"
+        android:strokeColor="#00FF66"
+        android:strokeWidth="2"
+        android:strokeLineJoin="round"/>
+
+</vector>
