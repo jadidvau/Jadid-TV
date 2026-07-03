@@ -73,7 +73,9 @@ class MainViewModel : ViewModel() {
                     ch
                 }
             }
-            filterChannels(updatedList, tab, query)
+            // Explicitly filter out any offline channels and dynamically compact the remaining list
+            val liveOnlyList = updatedList.filter { it.isOnline }
+            filterChannels(liveOnlyList, tab, query)
         } else {
             emptyList()
         }
@@ -103,6 +105,50 @@ class MainViewModel : ViewModel() {
         _currentChannel.value = channel
     }
 
+    private fun processAndFilterChannel(channel: Channel): Channel? {
+        val nameLower = channel.name.lowercase()
+        val catLower = channel.category.lowercase()
+
+        val isBangladesh = catLower.contains("bangladesh") || catLower.contains("bangla") || catLower.contains("bd") ||
+                nameLower.contains("bangla") || nameLower.contains("bd") || nameLower.contains("dhaka") || 
+                nameLower.contains("somoy") || nameLower.contains("jamuna") || nameLower.contains("gazi") || 
+                nameLower.contains("gtv") || nameLower.contains("t-sports") || nameLower.contains("tsports") || 
+                nameLower.contains("b tv") || nameLower.contains("btv") || nameLower.contains("channel i") || 
+                nameLower.contains("ntv") || nameLower.contains("r tv") || nameLower.contains("rtv") || 
+                nameLower.contains("atn") || nameLower.contains("ekattor") || nameLower.contains("independent") || 
+                nameLower.contains("news24") || nameLower.contains("deepto") || nameLower.contains("boishakhi") || 
+                nameLower.contains("asian tv") || nameLower.contains("sa tv") || nameLower.contains("duronto") || 
+                nameLower.contains("maasranga") || nameLower.contains("nagorik") || nameLower.contains("news 24") || 
+                nameLower.contains("news1") || nameLower.contains("channel24") || nameLower.contains("channel 24") || 
+                nameLower.contains("desh") || nameLower.contains("bijoy") || nameLower.contains("my tv") || 
+                nameLower.contains("mytv") || nameLower.contains("mohana") || nameLower.contains("ananda") || 
+                nameLower.contains("dusk") || nameLower.contains("silk") || nameLower.contains("bongo") || 
+                nameLower.contains("chorki") || nameLower.contains("toffee")
+
+        val isSports = catLower.contains("sport") || nameLower.contains("sport") || 
+                nameLower.contains("espn") || nameLower.contains("dazn") || nameLower.contains("tudn") || 
+                nameLower.contains("bein") || nameLower.contains("tyc") || nameLower.contains("win") || 
+                nameLower.contains("dsports") || nameLower.contains("golf") || nameLower.contains("eurosport") || 
+                nameLower.contains("match") || nameLower.contains("lig") || nameLower.contains("caze") || 
+                nameLower.contains("telefe") || nameLower.contains("teletrak") || nameLower.contains("suspis") || 
+                nameLower.contains("rtsh") || nameLower.contains("arena") || nameLower.contains("canal") || 
+                nameLower.contains("setenta") || nameLower.contains("digi") || nameLower.contains("m4") || 
+                nameLower.contains("ziggo") || nameLower.contains("cna") || nameLower.contains("deport") || 
+                nameLower.contains("fifa") || nameLower.contains("cricket") || nameLower.contains("ipl") || 
+                nameLower.contains("willow") || nameLower.contains("ten ") || nameLower.contains("ten1") || 
+                nameLower.contains("ten2") || nameLower.contains("ten3") || nameLower.contains("ten4") || 
+                nameLower.contains("ten5") || nameLower.contains("star sport") || nameLower.contains("sony sport") || 
+                nameLower.contains("astro") || nameLower.contains("skysport") || nameLower.contains("super sport") || 
+                nameLower.contains("supersport") || nameLower.contains("adrenalina") || nameLower.contains("ct sport") || 
+                nameLower.contains("čt sport")
+
+        return when {
+            isBangladesh -> channel.copy(category = "Bangladesh")
+            isSports -> channel.copy(category = "Sports")
+            else -> null
+        }
+    }
+
     fun loadPlaylist() {
         _playlistState.value = PlaylistState.Loading
         _channelPings.value = emptyMap()
@@ -110,27 +156,8 @@ class MainViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             // Parse local Cricfy playlist for immediate, robust sports-rich data
             val localChannels = try {
-                M3UParser.parse(com.example.playlist.CricfyPlaylist.M3U_CONTENT).map { channel ->
-                    val nameLower = channel.name.lowercase()
-                    val isSports = nameLower.contains("sport") || nameLower.contains("espn") || 
-                            nameLower.contains("dazn") || nameLower.contains("tudn") || 
-                            nameLower.contains("bein") || nameLower.contains("tyc") || 
-                            nameLower.contains("win") || nameLower.contains("dsports") || 
-                            nameLower.contains("golf") || nameLower.contains("eurosport") || 
-                            nameLower.contains("match") || nameLower.contains("lig") || 
-                            nameLower.contains("caze") || nameLower.contains("telefe") || 
-                            nameLower.contains("teletrak") || nameLower.contains("suspis") ||
-                            nameLower.contains("rtsh") || nameLower.contains("arena") ||
-                            nameLower.contains("canal") || nameLower.contains("setenta") ||
-                            nameLower.contains("digi") || nameLower.contains("m4") ||
-                            nameLower.contains("ziggo") || nameLower.contains("cna") ||
-                            nameLower.contains("deport")
-
-                    if (isSports && (channel.category.isEmpty() || channel.category == "All")) {
-                        channel.copy(category = "Sports")
-                    } else {
-                        channel
-                    }
+                M3UParser.parse(com.example.playlist.CricfyPlaylist.M3U_CONTENT).mapNotNull { channel ->
+                    processAndFilterChannel(channel)
                 }
             } catch (e: Exception) {
                 emptyList()
@@ -153,7 +180,9 @@ class MainViewModel : ViewModel() {
                                 if (response.isSuccessful) {
                                     val body = response.body?.string()
                                     if (!body.isNullOrEmpty()) {
-                                        val parsed = M3UParser.parse(body)
+                                        val parsed = M3UParser.parse(body).mapNotNull { channel ->
+                                            processAndFilterChannel(channel)
+                                        }
                                         allFetched.addAll(parsed)
                                     }
                                 }
@@ -181,17 +210,27 @@ class MainViewModel : ViewModel() {
     private fun measureAllPings(channels: List<Channel>) {
         val semaphore = Semaphore(5) // Limit to 5 concurrent stream tests
         viewModelScope.launch(Dispatchers.IO) {
-            channels.forEach { channel ->
+            val tempMap = java.util.Collections.synchronizedMap(mutableMapOf<String, Pair<Int, Boolean>>())
+            var lastUpdateTime = System.currentTimeMillis()
+
+            channels.map { channel ->
                 launch {
                     semaphore.withPermit {
                         val result = checkPing(channel.url)
-                        // Update ping map in real-time
-                        val currentMap = _channelPings.value.toMutableMap()
-                        currentMap[channel.id] = result
-                        _channelPings.value = currentMap
+                        tempMap[channel.id] = result
+
+                        // Batch update flow every 800ms to avoid overwhelming Compose with constant recompositions
+                        val now = System.currentTimeMillis()
+                        if (now - lastUpdateTime > 800) {
+                            _channelPings.value = tempMap.toMap()
+                            lastUpdateTime = now
+                        }
                     }
                 }
-            }
+            }.forEach { it.join() }
+
+            // Ensure everything is caught in the final update
+            _channelPings.value = tempMap.toMap()
         }
     }
 
@@ -236,29 +275,7 @@ class MainViewModel : ViewModel() {
         // Tab filtering
         if (tab != "All") {
             filtered = filtered.filter { channel ->
-                val cat = channel.category.lowercase()
-                val name = channel.name.lowercase()
-                when (tab.lowercase()) {
-                    "fifa world cup" -> {
-                        cat.contains("fifa") || name.contains("fifa") ||
-                        name.contains("fox sport") || name.contains("fox deport") || name.contains("fox soccer") ||
-                        name.contains("tudn") || name.contains("telemundo") || name.contains("tyc sport") ||
-                        name.contains("tyc") || name.contains("tnt sport") || name.contains("dazn") ||
-                        name.contains("bein") || name.contains("espn") || name.contains("eurosport") ||
-                        name.contains("match!") || name.contains("match tv") || name.contains("caze tv") ||
-                        name.contains("telefe") || name.contains("dsports") || name.contains("directv sports") ||
-                        name.contains("la liga") || name.contains("sky sport") || name.contains("m4 sport") ||
-                        name.contains("ziggo") || name.contains("tf1") || name.contains("bbc sport") ||
-                        name.contains("itv sport") || name.contains("rtsh sport") || name.contains("arena sport")
-                    }
-                    "live" -> cat.contains("live") || name.contains("live") || cat.contains("tv")
-                    "sports" -> cat.contains("sports") || name.contains("sports") || name.contains("cricket") || name.contains("t-sports") || name.contains("tsports") || cat.contains("sport")
-                    "news" -> cat.contains("news") || name.contains("news") || name.contains("khobor") || cat.contains("khobor") || name.contains("somoy") || name.contains("jamuna")
-                    "movies" -> cat.contains("movies") || name.contains("movies") || cat.contains("cinema") || name.contains("cinema") || cat.contains("film") || name.contains("film")
-                    "bangladesh" -> cat.contains("bangladesh") || name.contains("bangla") || name.contains("bd") || cat.contains("bd") || cat.contains("bangla") || name.contains("dhaka") || name.contains("somoy") || name.contains("jamuna")
-                    "india" -> cat.contains("india") || name.contains("india") || cat.contains("hindi") || name.contains("hindi") || name.contains("sony") || name.contains("zee") || name.contains("star") || cat.contains("india")
-                    else -> cat.contains(tab.lowercase())
-                }
+                channel.category.equals(tab, ignoreCase = true)
             }
         }
         

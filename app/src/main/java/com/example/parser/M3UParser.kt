@@ -1,6 +1,7 @@
 package com.example.parser
 
 import com.example.model.Channel
+import com.example.util.LogoResolver
 import java.io.BufferedReader
 import java.io.StringReader
 
@@ -22,10 +23,12 @@ object M3UParser {
                     currentMetadata = null
                 } else {
                     val nameFromUrl = trimmedLine.substringAfterLast("/").substringBefore("?")
+                    val finalName = if (nameFromUrl.isNotEmpty()) nameFromUrl else "Live Stream"
                     channels.add(
                         Channel(
-                            name = if (nameFromUrl.isNotEmpty()) nameFromUrl else "Live Stream",
+                            name = finalName,
                             url = trimmedLine,
+                            logoUrl = LogoResolver.getLogoUrl(finalName),
                             category = "All"
                         )
                     )
@@ -60,10 +63,12 @@ object M3UParser {
             rawName
         }
 
+        val resolvedLogoUrl = LogoResolver.getLogoUrl(cleanName) ?: logoUrl?.ifEmpty { null }
+
         return Channel(
             name = cleanName,
             url = url,
-            logoUrl = logoUrl?.ifEmpty { null },
+            logoUrl = resolvedLogoUrl,
             category = category
         )
     }

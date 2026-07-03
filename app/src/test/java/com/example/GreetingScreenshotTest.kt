@@ -24,7 +24,7 @@ class GreetingScreenshotTest {
   @Test
   fun greeting_screenshot() {
     val dummyChannel = Channel(
-        name = "Jadid Sports HD",
+        name = "ErrorXMollik Sports HD",
         category = "Sports",
         url = "https://example.com/stream.m3u8"
     )
