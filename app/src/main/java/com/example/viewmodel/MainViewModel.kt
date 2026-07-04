@@ -210,8 +210,8 @@ class MainViewModel : ViewModel() {
     private fun measureAllPings(channels: List<Channel>) {
         val semaphore = Semaphore(5) // Limit to 5 concurrent stream tests
         viewModelScope.launch(Dispatchers.IO) {
-            val tempMap = java.util.Collections.synchronizedMap(mutableMapOf<String, Pair<Int, Boolean>>())
-            var lastUpdateTime = System.currentTimeMillis()
+            val tempMap = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Boolean>>()
+            val lastUpdateTime = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
 
             channels.map { channel ->
                 launch {
@@ -221,9 +221,11 @@ class MainViewModel : ViewModel() {
 
                         // Batch update flow every 800ms to avoid overwhelming Compose with constant recompositions
                         val now = System.currentTimeMillis()
-                        if (now - lastUpdateTime > 800) {
-                            _channelPings.value = tempMap.toMap()
-                            lastUpdateTime = now
+                        val lastTime = lastUpdateTime.get()
+                        if (now - lastTime > 800) {
+                            if (lastUpdateTime.compareAndSet(lastTime, now)) {
+                                _channelPings.value = tempMap.toMap()
+                            }
                         }
                     }
                 }
