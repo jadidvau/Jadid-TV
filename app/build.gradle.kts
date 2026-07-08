@@ -6,6 +6,16 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
+// CI overrides these; local builds fall back to the checked-in defaults.
+// `providers.environmentVariable` (rather than System.getenv) keeps the
+// configuration cache correct — Gradle records the value as a build input.
+fun env(name: String) = providers.environmentVariable(name).orNull
+
+val releaseKeystore = file(env("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks")
+// Without a keystore *and* its passwords, AGP fails the release build outright.
+// Degrade to an unsigned release instead, so PR/fork builds still compile.
+val canSignRelease = releaseKeystore.exists() && env("STORE_PASSWORD") != null
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -14,19 +24,20 @@ android {
     applicationId = "com.jadidmollik.jadidtv"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = env("VERSION_CODE")?.toInt() ?: 1
+    versionName = env("VERSION_NAME") ?: "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+    if (canSignRelease) {
+      create("release") {
+        storeFile = releaseKeystore
+        storePassword = env("STORE_PASSWORD")
+        keyAlias = env("KEY_ALIAS") ?: "upload"
+        keyPassword = env("KEY_PASSWORD")
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -41,7 +52,7 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = if (canSignRelease) signingConfigs.getByName("release") else null
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
