@@ -75,10 +75,11 @@ jobs:
           java-version: "17"
 
       # No Gradle wrapper is committed, so provision Gradle explicitly.
-      # Keep this pinned in lockstep with AGP in gradle/libs.versions.toml.
+      # AGP 9.1.1 (gradle/libs.versions.toml) requires Gradle >= 9.3.1.
+      # Bump this whenever AGP's minimum moves.
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "9.1.0"
+          gradle-version: "9.3.1"
 
       - name: Write .env for the Secrets Gradle plugin
         env:
