@@ -2,42 +2,94 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version to release, without the leading v (e.g. 1.2.3)"
-        required: true
+      bump:
+        description: "Version bump. 'auto' reads Conventional Commits since the last tag."
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
       prerelease:
         description: "Mark the GitHub release as a pre-release"
         type: boolean
         default: false
 
 permissions:
-  contents: write # required to create the GitHub Release
+  contents: write # create the tag + GitHub Release
 
+# Never let two releases race: they would compute the same next version.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   release:
+    # Escape hatch: put [skip release] in a commit message to land code without
+    # cutting a release. (GitHub's own [skip ci] suppresses the whole run.)
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history + tags to compute the next version
 
-      - name: Resolve version
+      - name: Compute next version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            name="${{ inputs.version }}"
+          # Highest existing tag, by semver rather than commit date.
+          last="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+
+          if [ -z "$last" ]; then
+            # First ever release: start at 1.0.0 rather than bumping 0.0.0.
+            next="1.0.0"
+            echo "No existing tag; seeding at $next"
           else
-            name="$GITHUB_REF_NAME"
+            base="${last#v}"
+            IFS=. read -r major minor patch <<< "$base"
+            : "${major:=0}" "${minor:=0}" "${patch:=0}"
+
+            bump="${{ inputs.bump || 'auto' }}"
+            if [ "$bump" = "auto" ]; then
+              # Conventional Commits over the range since the last tag.
+              # `|| true` because grep -q exits 1 on no-match, and we run under set -e.
+              subjects="$(git log --format=%s "$last..HEAD")"
+              bodies="$(git log --format=%B "$last..HEAD")"
+
+              breaking=""
+              printf '%s\n' "$bodies"   | grep -qE '^BREAKING[ -]CHANGE'        && breaking=1 || true
+              printf '%s\n' "$subjects" | grep -qE '^[a-zA-Z]+(\(.+\))?!:'      && breaking=1 || true
+
+              feat=""
+              printf '%s\n' "$subjects" | grep -qE '^feat(\(.+\))?!?:'          && feat=1     || true
+
+              if   [ -n "$breaking" ]; then bump=major
+              elif [ -n "$feat" ];     then bump=minor
+              else                          bump=patch
+              fi
+              echo "Auto-detected bump: $bump"
+            fi
+
+            case "$bump" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              patch) patch=$((patch + 1)) ;;
+              *) echo "::error::Unknown bump '$bump'"; exit 1 ;;
+            esac
+            next="$major.$minor.$patch"
           fi
-          name="${name#v}" # tolerate both "1.2.3" and "v1.2.3"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          # run_number is monotonic per workflow, which is all Play requires.
-          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "::error::Tag v$next already exists. Nothing to release."
+            exit 1
+          fi
+
+          # Commit count is monotonic and survives workflow renames, unlike run_number.
+          code="$(git rev-list --count HEAD)"
+
+          echo "name=$next" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$next (versionCode $code)"
 
       # Three outcomes:
       #   all three secrets set  -> "upload"    (real, publishable key)
@@ -151,7 +203,10 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # The tag does not exist yet — this action creates it, pinned to the
+          # exact commit we just built (not whatever main points at by now).
           tag_name: v${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
           name: v${{ steps.version.outputs.name }}
           generate_release_notes: true
           # A throwaway-signed build must never sit at /releases/latest.
