@@ -16,10 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Java 21, not 17: Robolectric maps API 36 -> required Java 21
+      # (DefaultSdkProvider), and the @Config(sdk=[36]) tests throw
+      # "Android SDK 36 requires Java 21" on anything older.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       # AGP 9.1.1 (gradle/libs.versions.toml) requires Gradle >= 9.3.1.
       # Bump this whenever AGP's minimum moves.
@@ -28,6 +31,16 @@ jobs:
           gradle-version: "9.3.1"
           # Only let pushes to main write to the shared Gradle cache; PRs read it.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Robolectric pulls its ~100MB android-all-instrumented SDK image into
+      # ~/.m2, which setup-gradle does not cache. Without this every run
+      # re-downloads it from Maven Central.
+      - name: Cache Robolectric SDK jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-${{ runner.os }}-
 
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest

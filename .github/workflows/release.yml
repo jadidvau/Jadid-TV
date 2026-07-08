@@ -69,10 +69,11 @@ jobs:
             exit 1
           fi
 
+      # Kept at 21 to match ci.yml (Robolectric needs Java 21 for API 36).
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       # No Gradle wrapper is committed, so provision Gradle explicitly.
       # AGP 9.1.1 (gradle/libs.versions.toml) requires Gradle >= 9.3.1.
