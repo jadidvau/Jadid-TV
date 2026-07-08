@@ -59,7 +59,7 @@ jobs:
           if [ "$count" -eq 3 ]; then
             echo "mode=upload" >> "$GITHUB_OUTPUT"
             echo "suffix=" >> "$GITHUB_OUTPUT"
-          elif [ "$set" -eq 0 ]; then
+          elif [ "$count" -eq 0 ]; then
             echo "mode=ephemeral" >> "$GITHUB_OUTPUT"
             echo "suffix=-devsigned" >> "$GITHUB_OUTPUT"
             echo "::warning::No signing secrets. Building with a throwaway key generated for this run."
